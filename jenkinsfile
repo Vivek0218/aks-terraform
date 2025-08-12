@@ -1,28 +1,45 @@
 pipeline {
-    // 1. Define the agent
-    // Use 'any' to allow Jenkins to pick any available agent.
-    // The actual scan will run inside a dedicated Docker container.
     agent any
- 
-    // 2. Define stages of the pipeline
+
     stages {
-        // Stage 1: Checkout the source code from SCM
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
+                // Replace with your SCM checkout details (Git, SVN, etc.)
                 echo 'Checking out source code...'
-                // This command automatically checks out the code from the repository
-                // where this Jenkinsfile is located.
-                checkout scm
+				checkout scm	
             }
-        } 
-    }
-// Post-build actions that run at the end of the pipeline
+        }
+
+        stage('Trivy File System Scan') {
+            steps {
+                script {
+                    // Ensure Trivy is installed on the Jenkins agent or use a Docker container for Trivy.
+                    // The 'sh' step executes shell commands on the Jenkins agent.
+					try {
+						sh """
+							echo "Scanning the checked-out repository using Trivy..."
+                        # Scan the current directory for vulnerabilities, misconfigurations, and secrets.
+                        # --severity HIGH,CRITICAL: Report only high and critical severity issues.
+                        # --exit-code 1: Fail the pipeline if vulnerabilities with specified severity are found.
+                        # --format json -o trivy-report.json: Generate a JSON report file.
+							trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 1 --format json -o trivy-report.json 
+						"""
+						echo "Trivy Scan completed successfully."
+					} catch (Exception e) {
+						echo "Trivy scan failed. See logs for details."
+						error "Trivy found security issues or an error occurred."
+					} finally {
+						echo "Trivy scan results..."
+						archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true, fingerprint: true
+					}
+				}
+			}
+		}	
+	}	
     post {
         always {
-            echo "Pipeline finished."
-            // Clean up the workspace
-            cleanWs()
+			echo "Pipeline finished."
+			cleanWs()	
         }
     }
 }
-
