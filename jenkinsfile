@@ -3,10 +3,7 @@ pipeline {
     // It's a best practice to use a label for agents that have specific tools installed.
     // This ensures your job only runs on nodes equipped with Trivy.
     // If all your agents have Trivy, you can use 'agent any'.
-    agent {
-        label 'trivy-agent'
-    }
- 
+    agent any
     stages {
         // Stage 1: Checkout the source code
         stage('Checkout') {
