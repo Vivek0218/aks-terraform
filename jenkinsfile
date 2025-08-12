@@ -1,0 +1,28 @@
+pipeline {
+    // 1. Define the agent
+    // Use 'any' to allow Jenkins to pick any available agent.
+    // The actual scan will run inside a dedicated Docker container.
+    agent any
+ 
+    // 2. Define stages of the pipeline
+    stages {
+        // Stage 1: Checkout the source code from SCM
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                // This command automatically checks out the code from the repository
+                // where this Jenkinsfile is located.
+                checkout scm
+            }
+        } 
+    }
+// Post-build actions that run at the end of the pipeline
+    post {
+        always {
+            echo "Pipeline finished."
+            // Clean up the workspace
+            cleanWs()
+        }
+    }
+}
+
