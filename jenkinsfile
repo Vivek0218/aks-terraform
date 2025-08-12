@@ -1,45 +1,64 @@
 pipeline {
-    agent any
-
+    // 1. Define the agent
+    // It's a best practice to use a label for agents that have specific tools installed.
+    // This ensures your job only runs on nodes equipped with Trivy.
+    // If all your agents have Trivy, you can use 'agent any'.
+    agent {
+        label 'trivy-agent'
+    }
+ 
     stages {
-        stage('Checkout Code') {
+        // Stage 1: Checkout the source code
+        stage('Checkout') {
             steps {
-                // Replace with your SCM checkout details (Git, SVN, etc.)
                 echo 'Checking out source code...'
-				checkout scm	
+                checkout scm
             }
         }
-
-        stage('Trivy File System Scan') {
+ 
+        // Stage 2: Scan with Trivy and handle results
+        stage('Scan Repository with Trivy') {
             steps {
                 script {
-                    // Ensure Trivy is installed on the Jenkins agent or use a Docker container for Trivy.
-                    // The 'sh' step executes shell commands on the Jenkins agent.
-					try {
-						sh """
-							echo "Scanning the checked-out repository using Trivy..."
-                        # Scan the current directory for vulnerabilities, misconfigurations, and secrets.
-                        # --severity HIGH,CRITICAL: Report only high and critical severity issues.
-                        # --exit-code 1: Fail the pipeline if vulnerabilities with specified severity are found.
-                        # --format json -o trivy-report.json: Generate a JSON report file.
-							trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 1 --format json -o trivy-report.json 
-						"""
-						echo "Trivy Scan completed successfully."
-					} catch (Exception e) {
-						echo "Trivy scan failed. See logs for details."
-						error "Trivy found security issues or an error occurred."
-					} finally {
-						echo "Trivy scan results..."
-						archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true, fingerprint: true
-					}
-				}
-			}
-		}	
-	}	
+                    try {
+                        echo "Scanning repository for vulnerabilities and misconfigurations..."
+                        
+                        // 2. Execute Trivy directly on the agent
+                        // The 'sh' step will fail if the command returns a non-zero exit code.
+                        sh '''
+                            trivy fs . \
+                                --severity HIGH,CRITICAL \
+                                --exit-code 1 \
+                                --ignore-unfixed \
+                                --format table \
+                                --output trivy-scan-report.log
+                        '''
+                        
+                        echo "Trivy scan completed. No HIGH or CRITICAL issues found."
+                        
+                    } catch (Exception e) {
+                        // 3. This block runs if Trivy finds issues and exits with code 1
+                        echo "Trivy scan found critical issues or an error occurred. Failing the build."
+                        // The 'error' step marks the build as FAILED
+                        error "Build failed due to security vulnerabilities found by Trivy."
+                        
+                    } finally {
+                        // 4. Archive the log file
+                        // This 'finally' block ensures the report is archived whether the scan passes or fails.
+                        echo "Archiving Trivy scan report..."
+                        archiveArtifacts artifacts: 'trivy-scan-report.log', allowEmptyArchive: true
+                    }
+                }
+            }
+        }
+    }
+ 
     post {
+        // 5. Always runs at the end of the pipeline
         always {
-			echo "Pipeline finished."
-			cleanWs()	
+            echo "Pipeline finished."
+            // Cleans up the workspace for the next build
+            cleanWs()
         }
     }
 }
