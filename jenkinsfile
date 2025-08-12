@@ -1,9 +1,7 @@
 pipeline {
-    // 1. Define the agent
-    // It's a best practice to use a label for agents that have specific tools installed.
-    // This ensures your job only runs on nodes equipped with Trivy.
-    // If all your agents have Trivy, you can use 'agent any'.
+    // Agent with Trivy installed, identified by a label
     agent any
+ 
     stages {
         // Stage 1: Checkout the source code
         stage('Checkout') {
@@ -13,37 +11,66 @@ pipeline {
             }
         }
  
-        // Stage 2: Scan with Trivy and handle results
-        stage('Scan Repository with Trivy') {
+        // Stage 2: Scan for vulnerabilities in software dependencies
+        stage('Scan Repository for Dependencies') {
             steps {
                 script {
                     try {
-                        echo "Scanning repository for vulnerabilities and misconfigurations..."
+                        echo "Scanning repository for software vulnerabilities..."
                         
-                        // 2. Execute Trivy directly on the agent
-                        // The 'sh' step will fail if the command returns a non-zero exit code.
+                        // Use 'trivy fs' to find vulnerabilities in lock files, etc.
                         sh '''
                             trivy fs . \
+                                --scanners vuln \
                                 --severity HIGH,CRITICAL \
                                 --exit-code 1 \
                                 --ignore-unfixed \
                                 --format table \
-                                --output trivy-scan-report.log
+                                --output trivy-dependency-report.log
                         '''
                         
-                        echo "Trivy scan completed. No HIGH or CRITICAL issues found."
+                        echo "Trivy dependency scan completed. No HIGH or CRITICAL issues found."
                         
                     } catch (Exception e) {
-                        // 3. This block runs if Trivy finds issues and exits with code 1
-                        echo "Trivy scan found critical issues or an error occurred. Failing the build."
-                        // The 'error' step marks the build as FAILED
-                        error "Build failed due to security vulnerabilities found by Trivy."
+                        echo "Trivy found critical software vulnerabilities. Failing the build."
+                        error "Build failed due to software dependency vulnerabilities."
                         
                     } finally {
-                        // 4. Archive the log file
-                        // This 'finally' block ensures the report is archived whether the scan passes or fails.
-                        echo "Archiving Trivy scan report..."
-                        archiveArtifacts artifacts: 'trivy-scan-report.log', allowEmptyArchive: true
+                        // Archive the dependency scan report
+                        echo "Archiving Trivy dependency scan report..."
+                        archiveArtifacts artifacts: 'trivy-dependency-report.log', allowEmptyArchive: true
+                    }
+                }
+            }
+        }
+ 
+        // Stage 3: NEW - Scan Terraform files for IaC misconfigurations
+        stage('Scan Terraform for IaC Misconfigurations') {
+            steps {
+                script {
+                    try {
+                        echo "Scanning Terraform files for Azure AKS misconfigurations..."
+                        
+                        // 1. Use 'trivy config' to scan IaC files like Terraform
+                        sh '''
+                            trivy config . \
+                                --severity HIGH,CRITICAL \
+                                --exit-code 1 \
+                                --format table \
+                                --output trivy-iac-report.log
+                        '''
+                        
+                        echo "Trivy IaC scan completed. No HIGH or CRITICAL misconfigurations found."
+ 
+                    } catch (Exception e) {
+                        // 2. This block runs if Trivy finds issues in the Terraform code
+                        echo "Trivy found critical IaC misconfigurations. Failing the build."
+                        error "Build failed due to IaC misconfigurations in Terraform files."
+ 
+                    } finally {
+                        // 3. Archive the IaC scan report with a different name
+                        echo "Archiving Trivy IaC scan report..."
+                        archiveArtifacts artifacts: 'trivy-iac-report.log', allowEmptyArchive: true
                     }
                 }
             }
@@ -51,10 +78,9 @@ pipeline {
     }
  
     post {
-        // 5. Always runs at the end of the pipeline
+        // This runs at the end of the pipeline
         always {
             echo "Pipeline finished."
-            // Cleans up the workspace for the next build
             cleanWs()
         }
     }
