@@ -26,7 +26,7 @@ pipeline {
                                 --exit-code 1 \
                                 --ignore-unfixed \
                                 --format table \
-                                --output trivy-dependency-report.log
+                                --output trivy-dependency-report.txt
                         '''
                         
                         echo "Trivy dependency scan completed. No HIGH or CRITICAL issues found."
@@ -38,7 +38,7 @@ pipeline {
                     } finally {
                         // Archive the dependency scan report
                         echo "Archiving Trivy dependency scan report..."
-                        archiveArtifacts artifacts: 'trivy-dependency-report.log', allowEmptyArchive: true
+                        archiveArtifacts artifacts: 'trivy-dependency-report.txt', allowEmptyArchive: true
                     }
                 }
             }
@@ -57,7 +57,7 @@ pipeline {
                                 --severity HIGH,CRITICAL \
                                 --exit-code 1 \
                                 --format table \
-                                --output trivy-iac-report.log
+                                --output trivy-iac-report.txt
                         '''
                         
                         echo "Trivy IaC scan completed. No HIGH or CRITICAL misconfigurations found."
@@ -70,7 +70,7 @@ pipeline {
                     } finally {
                         // 3. Archive the IaC scan report with a different name
                         echo "Archiving Trivy IaC scan report..."
-                        archiveArtifacts artifacts: 'trivy-iac-report.log', allowEmptyArchive: true
+                        archiveArtifacts artifacts: 'trivy-iac-report.txt', allowEmptyArchive: true
                     }
                 }
             }
